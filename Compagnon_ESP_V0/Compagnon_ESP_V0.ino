@@ -30,6 +30,8 @@
 #include <Adafruit_BMP280.h>
 #include <SHT3x.h>
 #include <driver/adc.h>
+#include "esp_adc_cal.h"
+
 
 #define LED 5
 #define PWR 2
@@ -49,6 +51,7 @@
 #define I2C_SCL 19
 
 #define EEPROM_SIZE 12
+
 
 bool b1,b2,b3;
 
@@ -137,8 +140,7 @@ const unsigned char tache[] PROGMEM = { //18 * 12
 // | |   | | | (_) | || (_) |
 // |_|   |_|  \___/ \__\___/
 //================================================================
-int ReadBat(void);
-float RealBat(void);
+
 void choix_mode(void);
 void print_time(void);
 void choix_oui_non(void);
@@ -162,6 +164,9 @@ void draw_face_5(unsigned char pos);
 void draw_face_6(unsigned char pos);
 void draw_face_7(unsigned char pos);
 void draw_face_8(unsigned char pos);
+int pourcent_bat();
+int tension_bat();
+void setup_ADC();
 
 
 bool sound = 0;
@@ -185,12 +190,21 @@ unsigned char reglage = 0;
 unsigned int TabBat[MbrMoyenne+1];
 unsigned char lastBAT = 1200;
 
+
+//Gestion battrie
+static esp_adc_cal_characteristics_t adc1_chars;
+int tension_moyenne[16];
+bool init_cal_bat = 0;
+int lowpourcentage = 0;
+
+
 void IRAM_ATTR ISR() {
     digitalWrite(LED, LOW);  
     Serial.println("DODO");
     display.clearDisplay();
     digitalWrite(I2C_SDA,0);
     digitalWrite(I2C_SCL,0);
+    digitalWrite(MesBatEn,LOW);
     esp_deep_sleep_start();
 }
 
@@ -206,9 +220,6 @@ void setup() {
   pinMode(LED, OUTPUT);
   pinMode(MesBatEn, OUTPUT);
   
-  //adc1_config_width(ADC_WIDTH_BIT_12);
-  //adc1_config_channel_atten(ADC1_CHANNEL_4, ADC_ATTEN_DB_2_5);
-  
   pinMode(charge, INPUT);
   pinMode(MesBat, INPUT);
   pinMode(PWR, INPUT_PULLDOWN);
@@ -218,21 +229,12 @@ void setup() {
   pinMode(I2C_SDA, OUTPUT);
   pinMode(I2C_SCL, OUTPUT);
   //ledcAttachPin(PIN_BUZZER, 0);
-
+  
+  setup_ADC();
+  
   //Def deepsleep
   esp_deep_sleep_enable_gpio_wakeup(BIT(GPIO_NUM_2),ESP_GPIO_WAKEUP_GPIO_HIGH);
   attachInterrupt(2, ISR, FALLING);
-
-  for(int i = 0; i <= MbrMoyenne; i++){
-    ReadBat();
-  }
-  Serial.print("BAT ");
-  Serial.println(ReadBat());
-  if(ReadBat() < 940 && !digitalRead(charge)){
-    Serial.print("LOWBAT ");
-    Serial.println(ReadBat());
-    //esp_deep_sleep_start();
-  }
 
   //EERRPOM
   EEPROM.begin(EEPROM_SIZE);

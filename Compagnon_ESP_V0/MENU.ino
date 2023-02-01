@@ -10,21 +10,10 @@ void menu(void){
     menu_back("MENU",55);
 
     //Mesure de la battrie
-    digitalWrite(MesBatEn,HIGH);
+    
     display.setCursor(100,10);
-    
-    int analogData4  = adc1_get_raw((adc1_channel_t)4);
-    //Serial.println(analogData4);
-    float v1 = map(analogData4,0,4095,0,1100);    
-    
-    //display.print(RealBat()); //affiche la battrie
-    //display.print(float(v1/1000)); //affiche la battrie
-//    display.setCursor(100,20);
-    display.print(ReadBat()); //affiche la battrie
-    //display.print(digitalRead(charge));
-    delay(10);
-    digitalWrite(MesBatEn,LOW);
-
+    display.print(pourcent_bat());
+    display.print("%");
     
     for(int i = 0 ; i<4 ; i++){
       display.setTextColor(SSD1306_WHITE);

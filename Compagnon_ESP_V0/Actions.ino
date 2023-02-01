@@ -215,45 +215,6 @@ void choix_oui_non(void){
    delay(200);
 }
 
-int ReadBat(void){
-  digitalWrite(MesBatEn,HIGH);
-
-
-  for(int i = MbrMoyenne; i > 0; i--){
-    TabBat[i] = TabBat[i-1];
-  }
-
-//  for(int i = 0; i <= MbrMoyenne; i++){
-//    Serial.print(TabBat[i]);
-//    Serial.print(" ");
-//  }
-//  Serial.println(" ");
-  
-  unsigned long BatOutput = 0;
-  for(int i = 0; i <= MbrMoyenne; i++){
-    BatOutput += TabBat[i];
-  }
-
-  //Mesure de la battrie
-  TabBat[0] = analogRead(MesBat);
-
-  
-  digitalWrite(MesBatEn,LOW);
-  return (BatOutput/MbrMoyenne+1);
-}
-
-float RealBat(void){
-//  unsigned char bat = ReadBat();
-//  if(bat <= lastBAT){
-//    lastBAT = bat;
-//  }
-  int analogData4  = adc1_get_raw((adc1_channel_t)4);
-  float v1 = map(analogData4,0,4095,0,1100);
-  Serial.println(((v1/1000)*(10000+37000))/(10000));
-  return(((v1/1000)*(10000+37000))/(10000));
-  //return(constrain(map(lastBAT,950,1390,0,100),0,100));
-}
-
 //
 //void musique(void){
 //  tone(PIN_BUZZER, 2637, 200);
@@ -483,25 +444,23 @@ void crono(void){
 }
 
 void Print_info(void){
-
-  Serial.println("void Print_info(void)");
-  display.setCursor(0,0);
-  display.clearDisplay();
-  display.setTextColor(SSD1306_WHITE);
-  display.println("COMPAGNON");
-  display.println("-Soft ESP v0");
-  display.print("-LastMAJ ");
-  display.println(F(__DATE__));
-  display.println("-Hard ESP32-c3 V0.1");
-  display.println("");
-  display.println("by Alfred");
-  display.setCursor(110,50);
-  display.write(27);
-  display.display();
-  
   while(digitalRead(BP3) == LOW){
-    
-    Serial.println(digitalRead(BP3));
+    Serial.println("void Print_info(void)");
+    display.setCursor(0,0);
+    display.clearDisplay();
+    display.setTextColor(SSD1306_WHITE);
+    display.println("COMPAGNON");
+    display.println("-Soft ESP v0");
+    display.print  ("-LastMAJ "); display.println(F(__DATE__));
+    display.println("-Hard ESP32-c3 V0.1");
+    display.println("by Alfred");
+    display.print  ("V_bat "); display.print(tension_bat());   display.println("mV");
+    display.print  ("P_bat "); display.print(pourcent_bat());  display.println("%");
+    display.print  ("E_c ");   display.println(digitalRead(charge));
+    display.setCursor(110,50);
+    display.write(27);
+    display.display();
+    delay(10);
   }
 }
 
@@ -556,4 +515,53 @@ void Print_temp(void){
       Serial.println("%");
     }
   }
+}
+
+void setup_ADC(){
+  pinMode(MesBatEn, OUTPUT);
+  pinMode(charge, INPUT);
+  digitalWrite(MesBatEn,HIGH);
+  
+  esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_2_5, ADC_WIDTH_BIT_12, 0, &adc1_chars);
+  adc1_config_width(ADC_WIDTH_BIT_12);
+  adc1_config_channel_atten(ADC1_CHANNEL_4, ADC_ATTEN_DB_2_5);
+}
+
+int pourcent_bat(){
+  int pourcentage = map(tension_bat(),3500,4100,0,100);
+  
+  if(pourcentage > 100){
+    pourcentage=100;
+  }
+  else if(pourcentage<0){
+    pourcentage=0;
+  }
+  
+  return pourcentage;
+}
+
+
+int tension_bat(){
+  unsigned int moyenne_bat = 0;
+  delay(10);
+  if(!init_cal_bat){
+    init_cal_bat = 1;
+    for(int i = 0 ; i < 16 ; i++){
+      tension_moyenne[i] = esp_adc_cal_raw_to_voltage(adc1_get_raw((adc1_channel_t)4), &adc1_chars);
+      delay(1);
+    }
+  }
+  else{
+    for(int i = 15 ; i >= 0 ; i--){
+      tension_moyenne[i+1] = tension_moyenne[i];
+    }
+  tension_moyenne[0] = esp_adc_cal_raw_to_voltage(adc1_get_raw((adc1_channel_t)4), &adc1_chars) + 3;
+  }
+
+  for(int i = 0 ; i < 16 ; i++){
+      moyenne_bat = moyenne_bat + tension_moyenne[i];
+    }
+
+
+  return((moyenne_bat/16)*(32000+10000)/10000); // * ((32000+10000)/10000)
 }
